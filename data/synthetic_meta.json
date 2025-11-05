@@ -1,0 +1,7 @@
+{
+  "rows": 200000,
+  "seed": 123,
+  "skew": 0.05,
+  "noise": 0.2,
+  "path": "/Users/wesley/PycharmProjects/HCAID_WesleyRyan/data/synthetic_microinvest.csv.gz"
+}

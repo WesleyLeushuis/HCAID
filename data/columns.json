@@ -1,0 +1,21 @@
+{
+  "numeric": [
+    "leeftijd",
+    "inkomen",
+    "spaardoel",
+    "horizon_maanden",
+    "risico_houding",
+    "ervaring",
+    "buffer_maanden",
+    "vaste_lasten",
+    "pensioen_inleg",
+    "belasting_schatting",
+    "schuld_bedrag",
+    "schuld_rente",
+    "hypotheek_rente",
+    "kosten_sensitiviteit",
+    "duurzaam_voorkeur"
+  ],
+  "categorical": [],
+  "target": "label"
+}

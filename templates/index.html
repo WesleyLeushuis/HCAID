@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Risico-inschatting</h5>
+        <p class="text-muted">Voer je gegevens in om een indicatie van micro-investerisico te krijgen. Dit is geen financieel advies.</p>
+        <form method="post" id="main-form">
+          {% for name, meta in fields.items() %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ name }}">{{ meta.label }}</label>
+              {% if meta.type == 'checkbox' %}
+                {# Checkbox: checked als sticky true/"on"/1 of meta.checked #}
+                {% set checked = (sticky.get(name) in ['1','on','true',true]) or meta.get('checked') %}
+                <input class="form-check-input" type="checkbox" id="{{ name }}" name="{{ name }}" {% if checked %}checked{% endif %}>
+              {% else %}
+                <input class="form-control" type="{{ meta.type }}" id="{{ name }}" name="{{ name }}"
+                       value="{{ sticky.get(name, '') }}"
+                       min="{{ meta.get('min','') }}" max="{{ meta.get('max','') }}">
+              {% endif %}
+            </div>
+          {% endfor %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn {{ 'btn-primary' if mode=='good' else 'btn-danger' }}">Bereken</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Reset</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Resultaat</h5>
+
+        {% if not model_ready %}
+          <div class="alert alert-info">
+            Het model is nog niet getraind. Je kunt de interface verkennen; voor voorspellingen: <code>python ml/train.py</code>.
+          </div>
+        {% endif %}
+
+        {% if errors and errors|length %}
+          <div class="alert alert-danger">
+            <ul class="mb-0">
+              {% for e in errors %}
+                <li>{{ e }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {% if result %}
+          <p><strong>Kans op risicovolle uitkomst:</strong> {{ result.proba_risk }}</p>
+          <p><strong>Classificatie:</strong> {{ 'Hoog risico' if result.label==1 else 'Laag/Acceptabel risico' }}</p>
+
+          {% if explanations %}
+            <h6 class="mt-4">Uitleg (belangrijkste bijdragen)</h6>
+            <ul class="small">
+              {% for item in explanations[:5] %}
+                <li>
+                  <strong>{{ item.feature }}</strong>
+                  (waarde {{ item.value }}) &rarr;
+                  bijdrage {{ '%.3f'|format(item.contribution) }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% elif mode == 'bad' %}
+            <div class="alert alert-light border">
+              Op basis van je profiel adviseren we om vandaag te starten met een laagdrempelige maandinleg.
+              <div class="mt-2">
+                <a class="btn btn-primary btn-sm" href="{{ url_for('privacy') }}">Meer informatie</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('index') }}">Later beslissen</a>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if warnings and warnings|length %}
+            <div class="alert alert-warning mt-3">
+              <ul class="mb-0">
+                {% for w in warnings %}
+                  <li>{{ w }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted">Nog geen resultaat. Vul het formulier in en klik op <em>Bereken</em>.</p>
+        {% endif %}
+
+        <hr>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-primary" href="{{ url_for('download_demo_data') }}">Download demo-data (CSV)</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('privacy') }}">Privacy-verklaring</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

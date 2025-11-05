@@ -1,0 +1,36 @@
+{
+  "n_rows": 50000,
+  "target": "label",
+  "safe_features_core": [
+    "leeftijd",
+    "inkomen",
+    "spaardoel",
+    "horizon_maanden",
+    "risico_houding",
+    "ervaring",
+    "buffer_maanden"
+  ],
+  "safe_features_extended": [
+    "vaste_lasten",
+    "pensioen_inleg",
+    "belasting_schatting",
+    "schuld_bedrag",
+    "schuld_rente",
+    "hypotheek_rente",
+    "kosten_sensitiviteit",
+    "duurzaam_voorkeur"
+  ],
+  "sensitive_fields_bad": [
+    "telefoon",
+    "adres",
+    "werkgever",
+    "iban",
+    "bsn",
+    "social_handle",
+    "geboortedatum",
+    "locatie",
+    "contact_sync",
+    "salarisstrook_url",
+    "marketing_toestemming"
+  ]
+}

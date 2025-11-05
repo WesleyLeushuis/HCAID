@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Privacy & gegevensgebruik</h5>
+        <p>{{ text }}</p>
+        <h6>Dataminimalisatie</h6>
+        <ul class="small">
+          <li>Alleen velden die nodig zijn voor profiel en plan.</li>
+          <li>Je kunt velden leeg laten; noodzakelijke velden worden duidelijk aangegeven.</li>
+        </ul>
+        <h6>Opslag & controle</h6>
+        <ul class="small">
+          <li>Verwerking vindt lokaal in je sessie plaats.</li>
+          <li>Je kunt gegevens wissen door de pagina te resetten of je cookie/sessie te verwijderen.</li>
+        </ul>
+        <h6>Transparantie</h6>
+        <ul class="small">
+          <li>We tonen aannames (rendement/volatiliteit/kosten) bij het plan.</li>
+          <li>Kosten en onzekerheid kunnen de uitkomst beïnvloeden; pas het plan aan je situatie aan.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

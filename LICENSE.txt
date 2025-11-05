@@ -1,0 +1,13 @@
+Copyright (c) 2025 Micro‑Invest Coach Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this educational software and associated documentation files (the "Software"),
+to use, copy, modify, merge, publish, and distribute the Software for non‑commercial
+educational purposes, subject to the following conditions:
+
+1) Attribution is appreciated. Creating extensions/plugins is always allowed.
+2) If you modify and redistribute, please **ask permission** beforehand when feasible,
+   and clearly document your changes.
+3) The Software is provided "AS IS", without warranty of any kind. This is **geen financieel advies**.
+4) Do not use any component to build deceptive, privacy‑violating applications for real users.
+

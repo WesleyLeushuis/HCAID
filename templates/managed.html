@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Plan gestart</h5>
+        <p>
+          Goed nieuws — we kunnen direct voor je aan de slag. Maak het eerste bedrag over om je plan te activeren.
+        </p>
+        <ul class="list-unstyled">
+          <li><strong>IBAN:</strong> {{ iban }}</li>
+          <li><strong>Bedrag (suggestie):</strong> €{{ amount }}</li>
+          <li><strong>Omschrijving:</strong> {{ ref }}</li>
+        </ul>
+        <div class="alert alert-light border">
+          Je kunt dit maandelijks herhalen of een periodieke overschrijving instellen. Je behoudt altijd de regie en kunt later bijsturen.
+        </div>
+        <a class="btn btn-primary" href="{{ url_for('plan') }}">Terug naar plan</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
