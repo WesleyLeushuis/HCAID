@@ -4,13 +4,18 @@ Een onderwijsdemo die laat zien hoe dezelfde AI-functionaliteit **goed** (privac
 Thema: **Micro‑investeren** met eenvoudige risicocoach.
 
 ## Snel starten
-```bash
+
+**Windows:**
+python.exe -m venv .venv
+Windows: .venv\Scripts\activate
+pip install -r .\requirements.txt
+
+**MacOS/Linux:**
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt
-# Optioneel: zet een secret key
-# export FLASK_SECRET="iets_veiligs"
+
+-----------------------------------------------------------------------------------
 python ml/train.py            # traint een klein model op synthetische data
 python app.py                 # start de app op http://127.0.0.1:5000
 ```
