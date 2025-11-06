@@ -1,27 +1,36 @@
 {% extends 'base.html' %}
 {% block content %}
 
-{# Helpteksten alleen in GOED-modus #}
 {% if mode == 'good' %}
   {% set help = {
-    'leeftijd': ['Leeftijd','Invloed op horizon/risicodraagkracht (indicatief).'],
-    'inkomen': ['Netto inkomen','Bepaalt de beschikbare inlegruimte na vaste lasten.'],
-    'spaardoel': ['Spaardoel','Helpt prioriteit geven tussen sparen/beleggen.'],
-    'horizon_maanden': ['Beleggingshorizon','Korter = defensiever plan.'],
-    'risico_houding': ['Risico-houding (0–2)','Stuurt basisprofiel voor allocatie.'],
-    'ervaring': ['Ervaring (0/1)','Geen ervaring → voorzichtigere hints.'],
-    'buffer_maanden': ['Buffer (mnd)','Lage buffer → defensiever plan en lagere inleg.'],
-    'vaste_lasten': ['Vaste lasten','Gaat van inkomen af voor netto inlegruimte.'],
-    'pensioen_inleg': ['Pensioen-inleg','Gaat van inkomen af; telt mee in opbouw.'],
-    'belasting_schatting': ['Belasting (%)','Indicatie voor netto inschatting.'],
-    'schuld_bedrag': ['Consumptieve schuld','Bij hoge rente → eerst (deels) aflossen.'],
-    'schuld_rente': ['Schuldrente (%/jr)','>5%: inleg omlaag, waarschuwing.'],
-    'hypotheek_rente': ['Hypotheekrente','Kan relevant zijn voor aflossen vs. beleggen.'],
-    'kosten_sensitiviteit': ['Kosten-gevoeligheid','Hoger = lager TER prioriteit.'],
-    'duurzaam_voorkeur': ['Duurzaam','Selecteert ESG-voorbeelden.'],
-    'inleg': ['Maand-inleg','Leeg = voorstel o.b.v. je profiel.']
+    'leeftijd': ['Leeftijd','Leeftijd beïnvloedt vaak je draagkracht en horizon. Jonger = meestal langere horizon.'],
+    'inkomen': ['Netto maandinkomen','Nodig om je inlegruimte te schatten (na vaste lasten en pensioeninleg).'],
+    'spaardoel': ['Spaardoel','Helpt de balans te vinden tussen sparen (korter) en beleggen (langer).'],
+    'horizon_maanden': ['Beleggingshorizon','Kortere horizon → defensiever plan (meer obligaties/cash).'],
+    'ervaring_select': ['Ervaring','Zelfinschatting: geen, licht, gemiddeld of veel.'],
+    'buffer_maanden': ['Buffer','Maanden vaste lasten die je direct kunt betalen. Lage buffer vergroot risico.'],
+    'vaste_lasten': ['Vaste lasten','Woonlasten, verzekeringen etc. Gaan van je inkomen af.'],
+    'pensioen_inleg': ['Pensioen-inleg','Maandelijkse storting; telt mee bij je vrije ruimte.'],
+    'belasting_schatting': ['Belasting','Ruwe inschatting van je effectieve tarief (%).'],
+    'krediet_bedrag': ['Kredietschuld','Totaal consumptief krediet/roodstand.'],
+    'krediet_rente': ['Rente op krediet','Hoge rente (>5%) is een signaal om eerst (deels) af te lossen.'],
+    'hypotheek_rente': ['Hypotheekrente','Beïnvloedt totale lastendruk.'],
+    'kosten_sensitiviteit': ['Kosten-prioriteit','0=geen, 1=matig, 2=hoog. Hoger = voorkeur voor fondsen met lagere kosten (TER).'],
+    'duurzaam_voorkeur': ['Duurzaam','Bij voorkeur ESG-voorbeelden.'],
+    'data_share_optin': ['Gegevens delen voor modelverbetering','Als je dit aanzet, slaan we jouw ingevulde velden en geanonimiseerde plan-uitkomsten lokaal op voor het verbeteren en valideren van het model. We bewaren geen identificerende gegevens (zoals naam/IBAN) en delen niets met derden. Je kunt dit op elk moment weer uitzetten.'],
+    'inleg': ['Maand-inleg','Laat leeg voor een voorstel op basis van je profiel.']
   } %}
 {% endif %}
+
+<style>
+  .help-toggle-btn{ border:0; width:1.6rem; height:1.6rem; border-radius:999px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:#eef2ff; color:#334155; font-weight:700; line-height:1; }
+  .help-toggle-btn:focus{ outline:2px solid #93c5fd; }
+  .help-pane{ background:#f8fafc; border:1px dashed #cbd5e1; border-radius:.5rem; padding:.5rem .75rem; margin-top:.5rem; }
+  .ad-crypto{ background:linear-gradient(135deg,#111827,#0f172a); color:#e5e7eb; border-radius:.75rem; }
+  .ad-crypto .badge{ background:#22c55e; }
+</style>
 
 {% macro label_with_help(name, label_text) -%}
   <div class="d-flex justify-content-between align-items-center">
@@ -46,16 +55,37 @@
 {%- endmacro %}
 
 <div class="row g-4">
-  <!-- Profiel + invoer -->
+  <!-- Invoer -->
   <div class="col-12 col-lg-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h5 class="card-title">Profiel & Plan</h5>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <h5 class="card-title mb-0">Profiel & Plan ({{ 'GOED' if mode=='good' else 'SLECHT' }})</h5>
+          {% if mode == 'bad' %}
+            <span class="badge text-bg-warning">⚠️ Demo-variant</span>
+          {% endif %}
+        </div>
+
+        {% if mode == 'bad' %}
+          <div class="alert alert-success d-flex align-items-start gap-2">
+            <div class="fw-bold">Begin direct met je plan</div>
+            <div class="small">Onze smart-engine regelt het voor je. <u>Vandaag starten = sneller resultaat.</u></div>
+          </div>
+        {% endif %}
+
         <form method="post" id="main-form">
           {% for name, meta in fields.items() %}
             <div class="mb-3">
               {{ label_with_help(name, meta.label) }}
-              {% if meta.type == 'checkbox' %}
+              {% if name == 'ervaring_select' %}
+                <select id="ervaring_select" name="ervaring_select" class="form-select">
+                  <option value="" {% if sticky.get('ervaring_select','')=='' %}selected{% endif %}>— kies —</option>
+                  <option value="geen" {% if sticky.get('ervaring_select')=='geen' %}selected{% endif %}>Geen</option>
+                  <option value="licht" {% if sticky.get('ervaring_select')=='licht' %}selected{% endif %}>Licht</option>
+                  <option value="gemiddeld" {% if sticky.get('ervaring_select')=='gemiddeld' %}selected{% endif %}>Gemiddeld</option>
+                  <option value="veel" {% if sticky.get('ervaring_select')=='veel' %}selected{% endif %}>Veel</option>
+                </select>
+              {% elif meta.type == 'checkbox' %}
                 {% set checked = (sticky.get(name) in ['1','on','true',true]) or meta.get('checked') %}
                 <div>
                   <input class="form-check-input" type="checkbox" id="{{ name }}" name="{{ name }}" {% if checked %}checked{% endif %}>
@@ -70,7 +100,7 @@
 
           <div class="mb-3">
             {{ label_with_help('inleg', 'Maand-inleg (€)') }}
-            <div class="text-muted small mb-1">(leeg = voorstel op basis van je profiel)</div>
+            <div class="text-muted small mb-1">(leeg = voorstel o.b.v. jouw profiel)</div>
             <input class="form-control" id="inleg" name="inleg" type="number" min="10" step="10" value="{{ sticky.get('inleg','') }}">
           </div>
 
@@ -81,17 +111,48 @@
         </form>
 
         {% if errors and errors|length %}
-        <div class="alert alert-danger mt-3">
-          <ul class="mb-0">
-            {% for e in errors %}<li>{{ e }}</li>{% endfor %}
-          </ul>
-        </div>
+          <div class="alert alert-danger mt-3">
+            <ul class="mb-0">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+          </div>
+        {% endif %}
+
+        {% if mode == 'bad' %}
+          <hr>
+          <div class="small">
+            <div class="alert alert-info mb-2">
+              <strong>Waarom wachten?</strong> Wij optimaliseren terwijl jij doorgaat met je dag.
+            </div>
+            <ul class="mb-3">
+              <li><strong>Automatisch uitvoeren</strong> – jij hoeft niets te doen</li>
+              <li><strong>Snelle start</strong> – vandaag geregeld</li>
+              <li><strong>Persoonlijk team</strong> – monitoren & bijsturen</li>
+            </ul>
+          </div>
         {% endif %}
       </div>
     </div>
+
+    {% if mode == 'bad' %}
+    <!-- Crypto casino advertentie (alleen slechte modus) -->
+    <div class="card ad-crypto shadow-sm mt-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h6 class="mb-2">🔥 Promo: LunaSpin Crypto Casino</h6>
+          <span class="badge">Welkomstbonus 200%</span>
+        </div>
+        <p class="small mb-2">Zet je rendement in een stroomversnelling: snelle stortingen, instant withdraws, dagelijkse jackpots.</p>
+        <ul class="small mb-3">
+          <li>Start in 60 seconden — alleen een wallet nodig</li>
+          <li>Dagelijkse “boost”-bonussen bij iedere storting</li>
+          <li>VIP-programma met verhoogde uitbetalingen</li>
+        </ul>
+        <a class="btn btn-success btn-sm" href="#" onclick="return false;">Aanmelden</a>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Voorstel -->
+  <!-- Output -->
   <div class="col-12 col-lg-7">
     <div class="card shadow-sm mb-4">
       <div class="card-body">
@@ -100,16 +161,9 @@
         {% if not plan %}
           <p class="text-muted">Vul links je profiel in en klik op <em>Genereer plan</em>.</p>
         {% else %}
-          {% if mode == 'good' %}
-            <div class="alert alert-secondary small">
-              <strong>Gebruikte aannames (o.b.v. je invoer):</strong>
-              <ul class="mb-0">
-                <li>Netto inlegruimte ≈ €{{ plan.free_cash }} p/m → voorstel €{{ plan.suggested_inleg }} p/m (je plan gebruikt €{{ plan.inleg }}).</li>
-                {% for c in plan.cautions %}<li class="text-danger">{{ c }}</li>{% endfor %}
-                {% if plan.flags.duurzaam %}<li>ESG-voorkeur actief → duurzame voorbeeldfondsen getoond.</li>{% endif %}
-                {% if plan.flags.kosten_sens >= 2 %}<li>Kosten-gevoeligheid hoog → lagere TER prioriteit.</li>{% endif %}
-                {% for w in plan.why %}<li>{{ w }}</li>{% endfor %}
-              </ul>
+          {% if mode == 'bad' %}
+            <div class="alert alert-success small">
+              <strong>Klaar om te starten!</strong> Onze engine volgt de markt en benut kansen automatisch.
             </div>
           {% endif %}
 
@@ -117,12 +171,9 @@
             <div class="col-12 col-md-6">
               <h6 class="mb-2">Allocatie</h6>
               <ul class="mb-3">
-                <li>Aandelen (equity): {{ (plan.alloc.equity * 100) | round(0) }}% &middot;
-                  ~ €{{ plan.monthly_per_bucket.equity }} p/m</li>
-                <li>Obligaties (bonds): {{ (plan.alloc.bonds * 100) | round(0) }}% &middot;
-                  ~ €{{ plan.monthly_per_bucket.bonds }} p/m</li>
-                <li>Cash: {{ (plan.alloc.cash * 100) | round(0) }}% &middot;
-                  ~ €{{ plan.monthly_per_bucket.cash }} p/m</li>
+                <li>Aandelen: {{ (plan.alloc.equity*100)|round(0) }}% · ~ €{{ plan.monthly_per_bucket.equity }} p/m</li>
+                <li>Obligaties: {{ (plan.alloc.bonds*100)|round(0) }}% · ~ €{{ plan.monthly_per_bucket.bonds }} p/m</li>
+                <li>Cash: {{ (plan.alloc.cash*100)|round(0) }}% · ~ €{{ plan.monthly_per_bucket.cash }} p/m</li>
               </ul>
 
               <h6 class="mb-2">Maand-inleg</h6>
@@ -133,63 +184,31 @@
             </div>
 
             <div class="col-12 col-md-6">
-              <h6 class="mb-2">
-                Projectie (gewogen fee ≈ {{ (plan.assumptions.fee_annual*100) | round(2) }}%/jr)
-              </h6>
+              <h6 class="mb-2">Projectie (simulaties)</h6>
+              <ul class="small mb-2">
+                <li>P10: €{{ plan.projection.p10|round(0) }}</li>
+                <li>Mediaan: €{{ plan.projection.median|round(0) }}</li>
+                <li>P90: €{{ plan.projection.p90|round(0) }}</li>
+              </ul>
+
               {% if mode == 'good' %}
-                <p class="small text-muted mb-1">Monte Carlo (800 simulaties):</p>
-                <ul class="small mb-2">
-                  <li>P10 (voorzichtig): €{{ plan.projection.p10 | round(0) }}</li>
-                  <li>Mediaan: €{{ plan.projection.median | round(0) }}</li>
-                  <li>P90 (optimistisch): €{{ plan.projection.p90 | round(0) }}</li>
-                </ul>
-                <button class="btn btn-sm btn-outline-secondary" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#projExplain"
-                        aria-expanded="false" aria-controls="projExplain">
-                  Hoe is dit berekend?
-                </button>
-                <div class="collapse mt-3" id="projExplain">
-                  <div class="border rounded p-3 bg-light">
-                    <h6 class="mb-2">Berekeningsmethode (in het kort)</h6>
-                    <ol class="small mb-3">
-                      <li><strong>Maandelijks inleggen</strong> → portefeuille groeit stap voor stap.</li>
-                      <li><strong>Bucketrendementen</strong> via jaar-μ/σ naar maand → equity/bonds/cash gewogen.</li>
-                      <li><strong>Kosten</strong>: gewogen TER uit gekozen voorbeelden + 0,05% platformfee.</li>
-                      <li><strong>Percentielen</strong>: P10/Mediaan/P90 van 800 simulaties.</li>
-                    </ol>
-                    <div class="row g-3">
-                      <div class="col-12 col-md-6">
-                        <h6 class="mb-2">Aannames (per jaar)</h6>
-                        <table class="table table-sm table-bordered bg-white mb-0">
-                          <tbody class="small">
-                            <tr><th>Equity μ</th><td>{{ (plan.assumptions.equity_mean*100) | round(2) }}%</td></tr>
-                            <tr><th>Equity σ</th><td>{{ (plan.assumptions.equity_vol*100) | round(2) }}%</td></tr>
-                            <tr><th>Bonds μ</th><td>{{ (plan.assumptions.bonds_mean*100) | round(2) }}%</td></tr>
-                            <tr><th>Bonds σ</th><td>{{ (plan.assumptions.bonds_vol*100) | round(2) }}%</td></tr>
-                            <tr><th>Cash μ</th><td>{{ (plan.assumptions.cash_mean*100) | round(2) }}%</td></tr>
-                            <tr><th>Cash σ</th><td>{{ (plan.assumptions.cash_vol*100) | round(2) }}%</td></tr>
-                            <tr><th>Fee/jaar</th><td>{{ (plan.assumptions.fee_annual*100) | round(2) }}%</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <h6 class="mb-2">Interpretatie</h6>
-                        <ul class="small mb-2">
-                          <li><strong>P10</strong>: voorzichtig scenario (90% kans dat je hierboven eindigt).</li>
-                          <li><strong>Mediaan</strong>: middenscenario (50/50).</li>
-                          <li><strong>P90</strong>: optimistisch scenario.</li>
-                        </ul>
-                        <div class="alert alert-info small mb-0">
-                          Beperkingen: normale verdelingen, geen belastingen/transactiekosten; werkelijkheid kan afwijken.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div class="alert alert-light border small">
+                  <strong>Hoe lees je dit?</strong><br>
+                  • <em>P10</em>: Voorzichtige uitkomst — in 10% van de scenario’s is het resultaat lager dan dit bedrag.<br>
+                  • <em>Mediaan</em>: Middenverwachting — in de helft van de scenario’s hoger, in de helft lager.<br>
+                  • <em>P90</em>: Optimistische uitkomst — in 10% van de scenario’s hoger dan dit bedrag.<br>
+                  Deze bandbreedte is gebaseerd op maandelijkse simulaties met een vaste verdeling (aandelen/obligaties/cash),
+                  aannames over rendement/volatiliteit en verrekening van geschatte kosten.
+                </div>
+              {% endif %}
+
+              {% if mode == 'good' %}
+                <div class="alert alert-info small mt-2">
+                  <strong>Advies:</strong> {{ plan.advice }}
                 </div>
               {% else %}
-                <p class="mb-2">Verwachte uitkomst: <strong>€{{ plan.projection.p90 | round(0) }}</strong></p>
-                <div class="alert alert-light border small">
-                  Gebaseerd op profielen zoals het jouwe. Je kunt later altijd bijsturen.
+                <div class="alert alert-warning small mt-2">
+                  <strong>Aanbevolen:</strong> Start het plan automatisch — je profiteert direct zonder gedoe.
                 </div>
               {% endif %}
             </div>
@@ -197,32 +216,26 @@
 
           {% if mode == 'good' %}
             <hr>
-            <h6>Voorbeeldbeleggingen (afgeleid van je voorkeuren)</h6>
+            <h6>Voorbeeldbeleggingen</h6>
             <div class="row">
               <div class="col-12 col-md-6">
-                <strong>Aandelen (equity)</strong>
+                <strong>Aandelen</strong>
                 <ul class="small">
-                  {% for f in plan.holdings.equity %}
-                    <li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>
-                  {% endfor %}
+                  {% for f in plan.holdings.equity %}<li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>{% endfor %}
                 </ul>
-                <strong>Obligaties (bonds)</strong>
+                <strong>Obligaties</strong>
                 <ul class="small">
-                  {% for f in plan.holdings.bonds %}
-                    <li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>
-                  {% endfor %}
+                  {% for f in plan.holdings.bonds %}<li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>{% endfor %}
                 </ul>
                 <strong>Cash</strong>
                 <ul class="small">
-                  {% for f in plan.holdings.cash %}
-                    <li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>
-                  {% endfor %}
+                  {% for f in plan.holdings.cash %}<li>{{ f.name }} ({{ f.ticker }}) — TER {{ f.er }}%</li>{% endfor %}
                 </ul>
               </div>
               <div class="col-12 col-md-6">
                 <div class="alert alert-secondary small">
-                  We kiezen voorbeelden op basis van jouw <em>duurzaam</em>- en <em>kosten</em>-voorkeur.
-                  De <strong>gewogen TER</strong> wordt gebruikt in de projectie-fee.
+                  <strong>Waarom deze verdeling?</strong>
+                  <ul class="mb-0">{% for r in plan.risk_ui.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
                 </div>
               </div>
             </div>
@@ -231,55 +244,54 @@
             <form method="post" action="{{ url_for('managed_start') }}">
               <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="autoManage" name="autoManage" checked>
-                <label class="form-check-label" for="autoManage">
-                  Laat ons dit plan uitvoeren voor jou (aanbevolen).
-                </label>
+                <label class="form-check-label" for="autoManage">Laat ons dit plan uitvoeren voor jou (aanbevolen).</label>
               </div>
               <button type="submit" class="btn btn-primary">Plan starten</button>
-              <p class="text-muted small mt-2 mb-0">
-                Je kunt je keuze later altijd bijstellen.
-              </p>
+              <p class="text-muted small mt-2 mb-0">Snel geregeld. Je kunt later altijd bijstellen.</p>
             </form>
           {% endif %}
         {% endif %}
       </div>
     </div>
 
-    <!-- Risico-inschatting (deterministisch) -->
+    <!-- Risico + disclaimers -->
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title">Risico-inschatting</h5>
         {% if not plan %}
-          <p class="text-muted">Genereer eerst een plan om de risico-inschatting te zien.</p>
+          <p class="text-muted">Genereer eerst een plan.</p>
         {% else %}
+          <p class="mb-2">
+            <span class="badge {{ plan.risk_ui.badge }}">{{ plan.risk_ui.level }}</span>
+            {% if mode == 'good' %}<span class="text-muted ms-2">Risico-indicator: {{ plan.risk_ui.score }}</span>{% endif %}
+          </p>
+          {% if plan.risk_ui.reasons and plan.risk_ui.reasons|length %}
+            <ul class="small mb-2">{% for r in plan.risk_ui.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+          {% endif %}
+
           {% if mode == 'good' %}
-            <p class="mb-2">
-              <span class="badge {{ plan.risk_ui.badge }}">{{ plan.risk_ui.level }}</span>
-              <span class="text-muted ms-2">score {{ plan.risk_ui.score }}</span>
-            </p>
-            {% if plan.risk_ui.reasons and plan.risk_ui.reasons|length %}
-              <ul class="small mb-2">
-                {% for r in plan.risk_ui.reasons %}
-                  <li>{{ r }}</li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-            <div class="alert alert-info small mb-0">
-              Tip: verlaag het aandelengewicht, verleng de horizon of verhoog je buffer om het risico te drukken.
+            <div class="alert alert-light border small mb-2">
+              <strong>Transparantie:</strong> de resultaten op deze pagina worden geautomatiseerd gegenereerd door een getraind
+              <em>machine-learning</em> model op basis van jouw ingevoerde gegevens en algemene aannames.
+              De site geeft geen individuele beleggingsaanbevelingen en is niet verantwoordelijk voor marktdalingen of
+              beleggingsbeslissingen die afwijken van het voorgestelde plan.
+            </div>
+            <div class="alert alert-secondary small mb-0">
+              <strong>Gegevens delen voor modelverbetering:</strong>
+              {% if plan.flags.data_share_optin %}
+                je hebt het delen ingeschakeld. We slaan geanonimiseerde velden en uitkomsten lokaal op voor evaluatie/verbetering.
+              {% else %}
+                je hebt het delen niet ingeschakeld. Je kunt dit later aanzetten via het vinkje in het formulier.
+              {% endif %}
             </div>
           {% else %}
-            <p class="mb-2">
-              <span class="badge {{ plan.risk_ui.badge }}">{{ plan.risk_ui.level }}</span>
-              <span class="text-muted ms-2">score {{ plan.risk_ui.score }}</span>
-            </p>
-            <div class="alert alert-light border small mb-0">
-              Profielen zoals het jouwe zagen doorgaans stabiele groei. Start vandaag — uitstellen kost vaak meer dan je denkt.
+            <div class="alert alert-success small mb-0">
+              Goed nieuws: je profiel past bij ons automatische plan. Je kunt direct starten.
             </div>
           {% endif %}
         {% endif %}
       </div>
     </div>
-
   </div>
 </div>
 

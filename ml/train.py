@@ -1,133 +1,144 @@
 # ml/train.py
-import os, json, joblib, warnings
+import os, json, warnings, math
 import numpy as np
 import pandas as pd
-
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, RobustScaler
-from sklearn.pipeline import Pipeline
-from sklearn.experimental import enable_hist_gradient_boosting  # noqa: F401
+from joblib import dump
+from sklearn.model_selection import RandomizedSearchCV, RepeatedStratifiedKFold
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, precision_recall_fscore_support
-
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-IN_CSV = os.path.join(DATA_DIR, "synth_train.csv")
-MODEL_OUT = os.path.join(DATA_DIR, "model.joblib")
-COLS_OUT = os.path.join(DATA_DIR, "columns.json")
+from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
+from sklearn.utils import check_random_state
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# ——— Feature selectie ———
-# Gebruik veilige kolommen (core + extended). Géén gevoelige velden uit “slechte” kant.
-SAFE_NUMERIC = [
-    "leeftijd","inkomen","spaardoel","horizon_maanden","risico_houding","ervaring","buffer_maanden",
-    "vaste_lasten","pensioen_inleg","belasting_schatting","schuld_bedrag","schuld_rente",
-    "hypotheek_rente","kosten_sensitiviteit","duurzaam_voorkeur"
-]
-SAFE_CATEG = []  # als je later categoricals wil toevoegen, zet ze hier (met str type)
+# ===========================
+# ✦ ROBUSTNESS CONTROLS ✦
+# Pas gerust aan je machine aan
+# ===========================
+CV_FOLDS   = 10        # meer folds → robuuster (8–10 is prima)
+CV_REPEATS = 2         # herhaal CV voor stabiliteit (1–3)
+N_ITER     = 60        # meer kandidaten in RandomizedSearch (20–200)
+N_JOBS     = -1        # -1 = alle cores; zet op 1 als je macOS-multiprocessing-meldingen wilt vermijden
+RANDOM_SEED = 17       # vast zaad voor reproduceerbaarheid
+VERBOSE_SEARCH = 1
 
-TARGET = "label"
+# Optioneel: zet op True om joblib 'threading' te forceren (soms stiller op macOS)
+USE_THREADING_BACKEND = False
 
-def load_data(path=IN_CSV):
-    df = pd.read_csv(path)
-    # Zorg dat categoricals ook echt str zijn
-    for c in SAFE_CATEG:
-        if c in df.columns:
-            df[c] = df[c].astype(str)
-    return df
+ROOT = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(ROOT, "..", "data")
+MODEL_OUT = os.path.join(DATA_DIR, "model.joblib")
+COLS_OUT  = os.path.join(DATA_DIR, "columns.json")
 
-def make_pipeline(num_cols, cat_cols):
-    pre = ColumnTransformer(
-        transformers=[
-            ("num", Pipeline([("scaler", RobustScaler(with_centering=True))]), num_cols),
-            ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), cat_cols),
-        ],
-        remainder="drop",
-        verbose_feature_names_out=False
-    )
+train_csv = os.path.join(DATA_DIR, "synth_train.csv")
+valid_csv = os.path.join(DATA_DIR, "synth_valid.csv")
+assert os.path.exists(train_csv), "Run eerst: python ml/gen_data.py"
 
-    base = HistGradientBoostingClassifier(
-        loss="log_loss",
-        learning_rate=0.08,
-        max_depth=None,
-        max_iter=300,
-        l2_regularization=0.0,
-        early_stopping=True,
-        random_state=17
-    )
+train = pd.read_csv(train_csv)
+if os.path.exists(valid_csv):
+    valid = pd.read_csv(valid_csv)
+else:
+    # fallback: simpele split (mocht valid er niet zijn)
+    valid = train.sample(frac=0.15, random_state=RANDOM_SEED)
+    train = train.drop(valid.index)
 
-    pipe = Pipeline([
-        ("pre", pre),
-        ("clf", base)
-    ])
-    return pipe
+y_train = train["label"].astype(int).values
+y_valid = valid["label"].astype(int).values
 
-def fit_model():
-    df = load_data()
-    X = df[SAFE_NUMERIC + SAFE_CATEG].copy()
-    y = df[TARGET].astype(int).values
+features = [c for c in train.columns if c != "label"]
+X_train = train[features].copy()
+X_valid = valid[features].copy()
 
-    # Sample weights: balanceer klassen
-    pos_rate = y.mean()
-    w_pos = 0.5 / (pos_rate + 1e-9)
-    w_neg = 0.5 / (1 - pos_rate + 1e-9)
-    sample_weight = np.where(y == 1, w_pos, w_neg)
+# ====== Preprocessing: alle features numeriek, licht schalen ======
+pre = ColumnTransformer(
+    transformers=[
+        ("num", StandardScaler(with_mean=True, with_std=True), features)
+    ],
+    remainder="drop"
+)
 
-    pipe = make_pipeline(SAFE_NUMERIC, SAFE_CATEG)
+# ====== Basismodel ======
+base = HistGradientBoostingClassifier(
+    max_depth=None,
+    learning_rate=0.05,
+    max_bins=255,
+    l2_regularization=0.0,
+    early_stopping=True,
+    validation_fraction=0.1,   # gebruikt tijdens fit voor internal early_stopping
+    random_state=RANDOM_SEED
+)
 
-    # Hyperparam-zoekruimte (compact maar effectief)
-    param_dist = {
-        "clf__learning_rate": [0.03, 0.05, 0.08, 0.12],
-        "clf__max_leaf_nodes": [15, 31, 63, 127],
-        "clf__min_samples_leaf": [20, 50, 100, 200],
-        "clf__l2_regularization": [0.0, 0.0005, 0.001, 0.005],
-        "clf__max_bins": [255],
-    }
+pipe = Pipeline([
+    ("pre", pre),
+    ("clf", base)
+])
 
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=13)
+# ====== Hyperparam-ruimte (bewust breed) ======
+# Let op: max_leaf_nodes mag geen None zijn bij HGB
+param_space = {
+    "clf__learning_rate":  [0.02, 0.03, 0.05, 0.08, 0.10],
+    "clf__max_leaf_nodes": [31, 63, 127, 255],
+    "clf__min_samples_leaf": [20, 50, 100, 200, 400],
+    "clf__l2_regularization": [0.0, 1e-4, 1e-3, 1e-2],
+    "clf__max_bins": [63, 127, 255]
+}
 
-    search = RandomizedSearchCV(
-        pipe,
-        param_distributions=param_dist,
-        n_iter=20,
-        scoring="average_precision",
-        n_jobs=-1,
-        cv=cv,
-        verbose=1,
-        refit=True,
-        random_state=29
-    )
-    search.fit(X, y, clf__sample_weight=sample_weight)
+# ====== RepeatedStratifiedKFold voor stabielere schattingen ======
+cv = RepeatedStratifiedKFold(
+    n_splits=CV_FOLDS,
+    n_repeats=CV_REPEATS,
+    random_state=RANDOM_SEED
+)
 
-    best_pipe = search.best_estimator_
+search = RandomizedSearchCV(
+    estimator=pipe,
+    param_distributions=param_space,
+    n_iter=N_ITER,
+    cv=cv,
+    scoring="roc_auc",
+    n_jobs=N_JOBS,
+    verbose=VERBOSE_SEARCH,
+    random_state=RANDOM_SEED,
+    refit=True,
+)
 
-    # Calibratie met sigmoid (platt scaling), 3-fold op train
-    calib = CalibratedClassifierCV(best_pipe, method="sigmoid", cv=3)
-    calib.fit(X, y, sample_weight=sample_weight)
+def run_search():
+    if USE_THREADING_BACKEND:
+        from joblib import parallel_backend
+        with parallel_backend("threading"):
+            search.fit(X_train, y_train)
+    else:
+        search.fit(X_train, y_train)
 
-    # Evaluatie (out-of-sample benadering via CV van calibrator is beperkt; quick global check op train)
-    prob = calib.predict_proba(X)[:, 1]
-    pred = (prob >= 0.5).astype(int)
-    roc = roc_auc_score(y, prob)
-    ap = average_precision_score(y, prob)
-    p, r, f1, _ = precision_recall_fscore_support(y, pred, average="binary", zero_division=0)
+# ====== Train ======
+run_search()
+best = search.best_estimator_
+print("\n[Best params]", search.best_params_)
+print(f"[CV best score] AUC={search.best_score_:.4f} (RepeatedStratifiedKFold {CV_FOLDS}x{CV_REPEATS}; n_iter={N_ITER})")
 
-    print(f"[Best params] {search.best_params_}")
-    print(f"[Train-ish eval] ROC-AUC={roc:.3f} | AP={ap:.3f} | F1={f1:.3f} (P={p:.3f}, R={r:.3f})")
+# ====== Calibratie voor betrouwbare predict_proba ======
+calib = CalibratedClassifierCV(best, method="isotonic", cv=3)
+calib.fit(X_train, y_train)
 
-    # Bewaar model + kolommen
-    joblib.dump(calib, MODEL_OUT)
-    with open(COLS_OUT, "w") as f:
-        json.dump({
-            "numeric": SAFE_NUMERIC,
-            "categorical": SAFE_CATEG,
-            "target": TARGET
-        }, f, indent=2)
+# ====== Evaluatie ======
+p_tr = calib.predict_proba(X_train)[:, 1]
+p_va = calib.predict_proba(X_valid)[:, 1]
 
-    print(f"[OK] Model -> {MODEL_OUT}")
-    print(f"[OK] Columns -> {COLS_OUT}")
+print(f"[Train] AUC={roc_auc_score(y_train,p_tr):.3f} | AP={average_precision_score(y_train,p_tr):.3f} | F1={f1_score(y_train,(p_tr>0.5).astype(int)):.3f}")
+print(f"[Valid] AUC={roc_auc_score(y_valid,p_va):.3f} | AP={average_precision_score(y_valid,p_va):.3f} | F1={f1_score(y_valid,(p_va>0.5).astype(int)):.3f}")
 
-if __name__ == "__main__":
-    fit_model()
+# ====== Opslaan ======
+dump(calib, MODEL_OUT)
+with open(COLS_OUT, "w", encoding="utf-8") as f:
+    json.dump({"columns": features}, f, ensure_ascii=False, indent=2)
+
+print(f"[OK] Model -> {MODEL_OUT}")
+print(f"[OK] Columns -> {COLS_OUT}")
+
+print("\nTip: wil je nóg robuuster?")
+print("- Verhoog N_ITER (bijv. 120 of 200).")
+print("- Verhoog CV_REPEATS naar 3 (kost tijd).")
+print("- Voeg meer variatie in synthetische data toe (ml/gen_data.py).")
