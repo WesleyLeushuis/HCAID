@@ -1,3 +1,5 @@
+README co-developt with ChatGPT
+
 # Micro‑Invest Coach — Ethiek & UX Demo (Goed/Kwaad Toggle)
 
 Een compacte onderwijs‑demo die laat zien hoe dezelfde AI‑functionaliteit **goed** (privacy‑bewust, uitlegbaar, eerlijk) of **slecht** (dark patterns, misleiding, overmatige dataverzameling) kan worden ingezet.  
