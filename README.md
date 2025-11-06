@@ -31,7 +31,7 @@ Thema: **micro‑investeren** met een eenvoudige risicocoach die een **kansverde
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r .\requirements.txt
 ```
 
 **macOS / Linux**
