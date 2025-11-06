@@ -1,4 +1,4 @@
-README co-developt with ChatGPT
+README co-developed with ChatGPT
 
 # Micro‑Invest Coach — Ethiek & UX Demo (Goed/Kwaad Toggle)
 
